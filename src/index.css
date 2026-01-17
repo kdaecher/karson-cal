@@ -1,12 +1,26 @@
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  color: #000000;
-  background-color: #ffffff;
+  color: #312206;
+  background-color: #cebfb3;
 }
 
 body {
   margin: 0;
+  padding: 10px;
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  height: calc(100vh - 20px);
+  width: calc(100vw - 20px);
+}
+
+.event-container {
+  background-color: #9eae84;
+}
+
+.time-container {
+  background-color: #cebfb3;
+}
+
+.date-input {
+  border: none;
+  background-color: #cebfb3;
 }
