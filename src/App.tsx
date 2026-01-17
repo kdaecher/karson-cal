@@ -12,7 +12,7 @@ function App() {
   });
   const [calendars] = createResource(ical_client, (client) => client.fetchCalendars());
   const [startDate, setStartDate] = createSignal(new Date(new Date().setHours(0, 0, 0, 0))); // today at 12am
-  const [endDate, setEndDate] = createSignal(new Date(new Date().setHours(23, 59, 59, 999) + 28 * 24 * 60 * 60 * 1000)); // 28 days from now
+  const [endDate, setEndDate] = createSignal(new Date(new Date().setHours(23, 59, 59, 999) + 28 * 24 * 60 * 60 * 1000)); // 28 days from now at 11:59:59pm
 
   const [events] = createResource(
     () => {
@@ -37,16 +37,19 @@ function App() {
       })))
   );
 
+  const loading = createMemo(() => ical_client.loading || calendars.loading || events.loading);
+
   const eventsByDay = createMemo(() => {
     const evts = events();
     if (!evts) return {};
     const eventsByDay = evts.flat().reduce((acc, event) => {
       if (!event) return acc;
       const data = event.data;
-      const parsedData = parseToCalendarEvent(data);
-      const day = parsedData.startDate.toISOString().split('T')[0];
+      const parsedEvent = parseToCalendarEvent(data);
+      // Use 'en-CA' locale to get YYYY-MM-DD format in local time (toISOString() uses UTC, which can shift dates for evening events)
+      const day = parsedEvent.startDate.toLocaleDateString('en-CA');
       acc[day] = acc[day] || [];
-      acc[day].push(parsedData);
+      acc[day].push(parsedEvent);
       return acc;
     }, {} as Record<string, CalendarEvent[]>);
     for (const day in eventsByDay) {
@@ -79,25 +82,27 @@ function App() {
         </div>
       </div>
       <div style={{ display: 'grid', 'grid-template-columns': 'repeat(7, 1fr)', 'column-gap': '10px', 'row-gap': '30px', width: "100%"}}>
-        <For each={displayedDays()}>
-          {(day) => day ? (
-            <div style={{ display: 'flex', 'flex-direction': 'column', height: '100%', gap: '5px'}}>
-              <span style={{ 'font-size': '16px' }}>{new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' }).replace(",", "")}</span>
-              <div class="event-container" style={{ display: 'flex', 'flex-direction': 'column', gap: '10px', height: '100%', 'min-height': '10px', padding: '5px' }}>
-                <For each={(eventsByDay()[day] ?? [])}>
-                  {(event) => 
-                    <span >
-                      <span class="time-container" style={{ 'font-size': '12px', 'padding': '0px 2px' }}>
-                        {event.allDayEvent ? `ALL DAY` : `${event.startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric' }).toLowerCase().replace(" ", "")} - ${event.endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase().replace(" ", "")}`}
+        {loading() ? <div>Loading...</div> : (
+          <For each={displayedDays()}>
+            {(day) => day ? (
+              <div style={{ display: 'flex', 'flex-direction': 'column', height: '100%', gap: '5px'}}>
+                <span style={{ 'font-size': '16px' }}>{new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' }).replace(",", "")}</span>
+                <div class="event-container" style={{ display: 'flex', 'flex-direction': 'column', gap: '10px', height: '100%', 'min-height': '10px', padding: '5px' }}>
+                  <For each={(eventsByDay()[day] ?? [])}>
+                    {(event) => 
+                      <span >
+                        <span class="time-container" style={{ 'font-size': '12px', 'padding': '0px 2px' }}>
+                          {event.allDayEvent ? `ALL DAY` : `${event.startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric' }).toLowerCase().replace(" ", "")} - ${event.endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase().replace(" ", "")}`}
+                        </span>
+                        <span style={{ 'font-size': '16px' }}>{" "}{event.summary}</span>
                       </span>
-                      <span style={{ 'font-size': '16px' }}>{" "}{event.summary}</span>
-                    </span>
-                  }
-                </For>
+                    }
+                  </For>
+                </div>
               </div>
-            </div>
-          ) : <div />}
-        </For>
+            ) : <div />}
+          </For>
+        )}
       </div>
     </>
   );
