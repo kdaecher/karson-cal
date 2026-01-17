@@ -63,7 +63,7 @@ export interface CalendarEvent {
 
   organizer?: string;
 
-  attendees?: string[] | string[][];
+  //attendees?: string[] | string[][];
 
   recurrenceId?: number;
 

@@ -12,14 +12,13 @@ function App() {
   });
   const [calendars] = createResource(ical_client, (client) => client.fetchCalendars());
   const [startDate, setStartDate] = createSignal(new Date(new Date().setHours(0, 0, 0, 0))); // today at 12am
-  const [endDate, setEndDate] = createSignal(new Date(new Date().setHours(23, 59, 59, 999) + 7 * 24 * 60 * 60 * 1000)); // 7 days from now
+  const [endDate, setEndDate] = createSignal(new Date(new Date().setHours(23, 59, 59, 999) + 28 * 24 * 60 * 60 * 1000)); // 28 days from now
 
   const [events] = createResource(
     () => {
       const client = ical_client();
       const cals = calendars();
       if (!client || !cals) return null;
-      console.log(startDate(), endDate());
       return { client, cals, start: startDate(), end: endDate() };
     },
     async ({ client, cals, start, end }) =>
@@ -41,39 +40,63 @@ function App() {
   const eventsByDay = createMemo(() => {
     const evts = events();
     if (!evts) return {};
-    return evts.flat().reduce((acc, event) => {
+    const eventsByDay = evts.flat().reduce((acc, event) => {
       if (!event) return acc;
       const data = event.data;
       const parsedData = parseToCalendarEvent(data);
-      const day = new Date(parsedData.startDate).toISOString().split('T')[0];
+      const day = parsedData.startDate.toISOString().split('T')[0];
       acc[day] = acc[day] || [];
       acc[day].push(parsedData);
       return acc;
     }, {} as Record<string, CalendarEvent[]>);
+    for (const day in eventsByDay) {
+      eventsByDay[day].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+    }
+    return eventsByDay;
   });
 
-  const orderedDays = createMemo(() => Object.keys(eventsByDay() ?? {}).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()));
+  const displayedDays = createMemo(() => {
+    let date = startDate();
+    let day = date.getDay();
+    day = day === 0 ? 7 : day;
+    day-=1;
+    const displayedDays: string[] = [];
+    displayedDays.push(...Array.from({ length: day }, () => ""));
+    while (date.getTime() < endDate().getTime()) {
+      displayedDays.push(date.toISOString().split('T')[0]);
+      date = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+    }
+    return displayedDays;
+  });
   
   return (
     <>
-      <input type="date" value={startDate().toISOString().split('T')[0]} onInput={(e) => setStartDate(new Date(e.target.value + 'T00:00:00'))} />
-      <input type="date" value={endDate().toISOString().split('T')[0]} onInput={(e) => setEndDate(new Date(e.target.value + 'T00:00:00'))} />
-      <div style={{ display: 'flex', "flex-direction": 'row', gap: '10px'}}>
-        <For each={orderedDays()}>
-          {(day) => (
-            <div>
-              <p>{new Date(day).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' })}</p>
-              <div style={{ display: 'flex', "flex-direction": 'column', gap: '10px', border: '1px solid black', padding: '10px'}}>
-                <For each={eventsByDay()[day]}>
+      <div style={{ display: 'flex', 'flex-direction': 'row', 'align-items': 'center', 'gap': '40px', 'font-size': '30px', 'margin-bottom': '30px'}}>
+        <span style={{'font-size': '30px'}}>karson-cal</span>
+        <div style={{ display: 'flex', 'flex-direction': 'row', gap: '10px', height: 'fit-content'}}>
+          <input class="date-input" type="date" value={startDate().toISOString().split('T')[0]} onInput={(e) => setStartDate(new Date(e.target.value + 'T00:00:00'))} />
+          <input class="date-input" type="date" value={endDate().toISOString().split('T')[0]} onInput={(e) => setEndDate(new Date(e.target.value + 'T00:00:00'))} />
+        </div>
+      </div>
+      <div style={{ display: 'grid', 'grid-template-columns': 'repeat(7, 1fr)', 'column-gap': '10px', 'row-gap': '30px', width: "100%"}}>
+        <For each={displayedDays()}>
+          {(day) => day ? (
+            <div style={{ display: 'flex', 'flex-direction': 'column', height: '100%', gap: '5px'}}>
+              <span style={{ 'font-size': '16px' }}>{new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' }).replace(",", "")}</span>
+              <div class="event-container" style={{ display: 'flex', 'flex-direction': 'column', gap: '10px', height: '100%', 'min-height': '10px', padding: '5px' }}>
+                <For each={(eventsByDay()[day] ?? [])}>
                   {(event) => 
-                    <div>
-                      {event.startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric' })} - {event.endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true })} {event.summary}
-                    </div>
+                    <span >
+                      <span class="time-container" style={{ 'font-size': '12px', 'padding': '0px 2px' }}>
+                        {event.allDayEvent ? `ALL DAY` : `${event.startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric' }).toLowerCase().replace(" ", "")} - ${event.endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase().replace(" ", "")}`}
+                      </span>
+                      <span style={{ 'font-size': '16px' }}>{" "}{event.summary}</span>
+                    </span>
                   }
                 </For>
               </div>
             </div>
-          )}
+          ) : <div />}
         </For>
       </div>
     </>
@@ -87,9 +110,12 @@ export default App
 function parseToCalendarEvent(iCalendarData: string): CalendarEvent {
   const jcalData = ICAL.parse(iCalendarData);
   const vcalendar = new ICAL.Component(jcalData);
-  const vevent = vcalendar.getFirstSubcomponent('vevent');
+  const vevent: ICAL.Component | null= vcalendar.getFirstSubcomponent('vevent');
+  if (!vevent) throw new Error('No vevent found');
   const event = new ICAL.Event(vevent);
-  const tzid = vcalendar.getFirstSubcomponent('vtimezone') ? vcalendar.getFirstSubcomponent('vtimezone').getFirstPropertyValue('tzid') : 'Europe/Berlin';
+  const dtstart= vevent.getFirstPropertyValue('dtstart');
+  if (!dtstart) throw new Error('No dtstart found');
+  const tzid = (dtstart as any).timezone as string;
   const duration = {
       weeks: event.duration.weeks,
       days: event.duration.days,
@@ -98,10 +124,6 @@ function parseToCalendarEvent(iCalendarData: string): CalendarEvent {
       seconds: event.duration.seconds,
       isNegative: event.duration.isNegative
   }
-  const attendees = [];
-  event.attendees.forEach((value) => {
-      attendees.push(value.getValues());
-  });
 
   // if you try to add a event with `METHOD:REQUEST` in another calendar you will get `The HTTP 415 Unsupported Media Type` error.
   const iCalData = iCalendarData.replace('METHOD:REQUEST', '');
@@ -116,8 +138,7 @@ function parseToCalendarEvent(iCalendarData: string): CalendarEvent {
       endDate: event.endDate.toJSDate(),
       duration,
       organizer: event.organizer,
-      attendees,
-      recurrenceId: event.recurrenceId,
+      recurrenceId: event.recurrenceId?.toUnixTime(),
       allDayEvent: isAllDayEvent(duration),
       tzid,
       iCalendarData: iCalData
@@ -126,5 +147,10 @@ function parseToCalendarEvent(iCalendarData: string): CalendarEvent {
 }
 
 function isAllDayEvent(duration: CalendarEventDuration) {
-  return duration.days === 1 && duration.hours === 0 && duration.minutes === 0 && duration.seconds === 0 && duration.weeks === 0;
+  return duration.days === 1 &&
+  duration.hours === 0 && 
+  duration.minutes === 0 && 
+  duration.seconds === 0 && 
+  duration.weeks === 0 &&
+  duration.isNegative === false;
 }
