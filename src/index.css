@@ -1,7 +1,11 @@
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  color: #312206;
-  background-color: #cebfb3;
+  --color-primary: #b9cfd7;
+  --color-secondary: #b8a589;
+  --color-tertiary: #b8d5d9;
+  --color-text: #2d2009;
+  color: var(--color-text);
+  background-color: var(--color-primary);
 }
 
 body {
@@ -13,14 +17,17 @@ body {
 }
 
 .event-container {
-  background-color: #9eae84;
+  background-color: var(--color-secondary);
+  border: 1px solid var(--color-text);
 }
 
 .time-container {
-  background-color: #cebfb3;
+  background-color: var(--color-tertiary);
+  border: 1px solid var(--color-text);
 }
 
 .date-input {
-  border: none;
-  background-color: #cebfb3;
+  /* border: none; */
+  background-color: var(--color-primary);
+  color: var(--color-text);
 }

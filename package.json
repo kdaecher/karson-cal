@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "ical.js": "^2.2.1",
+    "rrule": "^2.8.1",
     "solid-js": "^1.9.10",
     "tsdav": "^2.1.6"
   },
