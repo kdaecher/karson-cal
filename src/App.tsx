@@ -1,6 +1,7 @@
 
 import { createResource, createSignal, createMemo, For } from 'solid-js';
 import ICAL from 'ical.js';
+import { RRule } from 'rrule';
 
 import { ical_client as ical_client_instance  } from './dav_client';
 import type { CalendarEvent, CalendarEventDuration } from './types';
@@ -45,11 +46,13 @@ function App() {
     const eventsByDay = evts.flat().reduce((acc, event) => {
       if (!event) return acc;
       const data = event.data;
-      const parsedEvent = parseToCalendarEvent(data);
-      // Use 'en-CA' locale to get YYYY-MM-DD format in local time (toISOString() uses UTC, which can shift dates for evening events)
-      const day = parsedEvent.startDate.toLocaleDateString('en-CA');
-      acc[day] = acc[day] || [];
-      acc[day].push(parsedEvent);
+      const parsedEvents = parseToCalendarEvents(data, startDate(), endDate());
+      parsedEvents.forEach(pevent => {
+        // Use 'en-CA' locale to get YYYY-MM-DD format in local time (toISOString() uses UTC, which can shift dates for evening events)
+        const day = pevent.startDate.toLocaleDateString('en-CA');
+        acc[day] = acc[day] || [];
+        acc[day].push(pevent);
+      });
       return acc;
     }, {} as Record<string, CalendarEvent[]>);
     for (const day in eventsByDay) {
@@ -82,7 +85,7 @@ function App() {
         </div>
       </div>
       <div style={{ display: 'grid', 'grid-template-columns': 'repeat(7, 1fr)', 'column-gap': '10px', 'row-gap': '30px', width: "100%"}}>
-        {loading() ? <div>Loading...</div> : (
+        {loading() ? <div>loading...</div> : (
           <For each={displayedDays()}>
             {(day) => day ? (
               <div style={{ display: 'flex', 'flex-direction': 'column', height: '100%', gap: '5px'}}>
@@ -112,7 +115,9 @@ export default App
 
 
 /** adapted from [simple-caldav-client](https://github.com/TheJLifeX/simple-caldav-client) */
-function parseToCalendarEvent(iCalendarData: string): CalendarEvent {
+function parseToCalendarEvents(iCalendarData: string, startDate: Date, endDate: Date): CalendarEvent[] {
+  const match = iCalendarData.match(/X-MASTER-RRULE:(.+)/);
+  const masterRRule = match ? match[1] : null;
   const jcalData = ICAL.parse(iCalendarData);
   const vcalendar = new ICAL.Component(jcalData);
   const vevent: ICAL.Component | null= vcalendar.getFirstSubcomponent('vevent');
@@ -122,12 +127,18 @@ function parseToCalendarEvent(iCalendarData: string): CalendarEvent {
   if (!dtstart) throw new Error('No dtstart found');
   const tzid = (dtstart as any).timezone as string;
   const duration = {
-      weeks: event.duration.weeks,
-      days: event.duration.days,
-      hours: event.duration.hours,
-      minutes: event.duration.minutes,
-      seconds: event.duration.seconds,
-      isNegative: event.duration.isNegative
+    weeks: event.duration.weeks,
+    days: event.duration.days,
+    hours: event.duration.hours,
+    minutes: event.duration.minutes,
+    seconds: event.duration.seconds,
+    isNegative: event.duration.isNegative,
+  };
+
+  const occurrences: Date[] = [];
+  if (masterRRule) {
+    const rrule = RRule.fromString(`DTSTART:${event.startDate.toICALString()};\n${masterRRule}`);
+    occurrences.push(...rrule.between(startDate, endDate));
   }
 
   // if you try to add a event with `METHOD:REQUEST` in another calendar you will get `The HTTP 415 Unsupported Media Type` error.
@@ -148,7 +159,24 @@ function parseToCalendarEvent(iCalendarData: string): CalendarEvent {
       tzid,
       iCalendarData: iCalData
   };
-  return calendarEvent;
+  if (occurrences.length > 0) {
+    return occurrences.map(occurrence => {
+      const startDate = new Date(occurrence);
+      startDate.setHours(event.startDate.hour);
+      startDate.setMinutes(event.startDate.minute);
+      startDate.setSeconds(event.startDate.second);
+      const endDate = new Date(occurrence);
+      endDate.setHours(event.endDate.hour);
+      endDate.setMinutes(event.endDate.minute);
+      endDate.setSeconds(event.endDate.second);
+      return {
+        ...calendarEvent,
+        startDate,
+        endDate,
+      };
+    });
+  }
+  return [calendarEvent];
 }
 
 function isAllDayEvent(duration: CalendarEventDuration) {
