@@ -77,8 +77,8 @@ function App() {
   
   return (
     <>
-      <div style={{ display: 'flex', 'flex-direction': 'row', 'align-items': 'center', 'gap': '40px', 'font-size': '30px', 'margin-bottom': '30px'}}>
-        <span style={{'font-size': '30px'}}>karson-cal</span>
+      <div style={{ display: 'flex', 'flex-direction': 'row', 'align-items': 'center', 'gap': '10px', 'font-size': '30px', 'margin-bottom': '30px'}}>
+        <span style={{'font-size': '24px'}}>karson-cal</span>
         <div style={{ display: 'flex', 'flex-direction': 'row', gap: '10px', height: 'fit-content'}}>
           <input class="date-input" type="date" value={startDate().toISOString().split('T')[0]} onInput={(e) => setStartDate(new Date(e.target.value + 'T00:00:00'))} />
           <input class="date-input" type="date" value={endDate().toISOString().split('T')[0]} onInput={(e) => setEndDate(new Date(e.target.value + 'T00:00:00'))} />
@@ -86,25 +86,30 @@ function App() {
       </div>
       <div style={{ display: 'grid', 'grid-template-columns': 'repeat(7, 1fr)', 'column-gap': '10px', 'row-gap': '30px', width: "100%"}}>
         {loading() ? <div>loading...</div> : (
-          <For each={displayedDays()}>
-            {(day) => day ? (
-              <div style={{ display: 'flex', 'flex-direction': 'column', height: '100%', gap: '5px'}}>
-                <span style={{ 'font-size': '16px' }}>{new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'numeric', day: 'numeric' }).replace(",", "")}</span>
-                <div class="event-container" style={{ display: 'flex', 'flex-direction': 'column', gap: '10px', height: '100%', 'min-height': '10px', padding: '5px' }}>
-                  <For each={(eventsByDay()[day] ?? [])}>
-                    {(event) => 
-                      <span >
-                        <span class="time-container" style={{ 'font-size': '12px', 'padding': '0px 2px' }}>
-                          {event.allDayEvent ? `ALL DAY` : `${event.startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric' }).toLowerCase().replace(" ", "")} - ${event.endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase().replace(" ", "")}`}
+          <>
+            <For each={["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}>
+              {(day) => <span style={{ 'font-size': '20px', 'text-transform': 'uppercase' }}>{day}</span>}
+            </For>
+            <For each={displayedDays()}>
+              {(day) => day ? (
+                <div style={{ display: 'flex', 'flex-direction': 'column', height: '100%', gap: '5px'}}>
+                  <span style={{ 'font-size': '16px' }}>{new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }).replace(",", "")}</span>
+                  <div class="event-container" style={{ display: 'flex', 'flex-direction': 'column', gap: '10px', height: '100%', 'min-height': '10px', padding: '5px' }}>
+                    <For each={(eventsByDay()[day] ?? [])}>
+                      {(event) => 
+                        <span >
+                          <span class="time-container" style={{ 'font-size': '12px', 'padding': '0px 2px' }}>
+                            {event.allDayEvent ? `ALL DAY` : `${event.startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric' }).toLowerCase().replace(" ", "")} - ${event.endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase().replace(" ", "")}`}
+                          </span>
+                          <span style={{ 'font-size': '14px' }}>{" "}{event.summary}</span>
                         </span>
-                        <span style={{ 'font-size': '16px' }}>{" "}{event.summary}</span>
-                      </span>
-                    }
-                  </For>
+                      }
+                    </For>
+                  </div>
                 </div>
-              </div>
-            ) : <div />}
-          </For>
+              ) : <div />}
+            </For>
+          </>
         )}
       </div>
     </>
